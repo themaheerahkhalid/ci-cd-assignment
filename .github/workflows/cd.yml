@@ -18,17 +18,13 @@ jobs:
           path: .
 
       - name: Unzip artifact
-        run: unzip app.zip -d app
+        run: unzip -o app.zip -d .
 
       - name: Install dependencies
-        run: |
-          cd app
-          npm install
+        run: npm install
 
       - name: Install PM2 globally
         run: npm install -g pm2
 
       - name: Start app with PM2
-        run: |
-          cd app
-          pm2 start src/index.js --name chat-app --watch
+        run: pm2 start src/index.js --name chat-app --watch
