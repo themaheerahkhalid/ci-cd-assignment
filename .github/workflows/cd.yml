@@ -3,28 +3,69 @@ name: CD
 on:
   workflow_run:
     workflows: ["CI"]
-    types:
-      - completed
+    types: [completed]
 
 jobs:
   deploy:
-    runs-on: self-hosted
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: self-hosted
 
     steps:
-      - name: Download artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: node-app-zip
-          path: .
+      - name: Show workspace
+        shell: pwsh
+        run: 'Write-Host "Workspace: ${{ github.workspace }}"'
 
-      - name: Unzip app
-        run: Expand-Archive -Path app.zip -DestinationPath . -Force
+      # Download artifact using GitHub API + PAT
+      - name: Download artifact (node-app-zip) via API
+        shell: pwsh
+        env:
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          PAT: ${{ secrets.ACTIONS_PAT }}
+        run: |
+          $headers = @{
+            Authorization = "token $env:PAT"
+            Accept        = "application/vnd.github+json"
+          }
+
+          $artifactsUrl = "https://api.github.com/repos/$env:REPO/actions/runs/$env:RUN_ID/artifacts"
+          Write-Host "Fetching artifacts from: $artifactsUrl"
+
+          $resp = Invoke-RestMethod -Headers $headers -Uri $artifactsUrl -Method Get
+          if (-not $resp -or -not $resp.artifacts) { throw "No artifacts returned for run $env:RUN_ID" }
+
+          $artifact = $resp.artifacts | Where-Object { $_.name -eq "node-app-zip" } | Select-Object -First 1
+          if (-not $artifact) { throw "Artifact 'node-app-zip' not found in run $env:RUN_ID" }
+
+          $zip1 = Join-Path $env:RUNNER_TEMP "artifact.zip"
+          Invoke-WebRequest -Headers $headers -Uri $artifact.archive_download_url -OutFile $zip1
+          Write-Host "Downloaded artifact archive to $zip1"
+
+          # Extract outer artifact archive
+          Expand-Archive -Path $zip1 -DestinationPath "${{ github.workspace }}" -Force
+
+          # Extract inner app.zip
+          $appZip = Join-Path "${{ github.workspace }}" "app.zip"
+          if (-not (Test-Path $appZip)) { throw "Inner app.zip not found after first expand." }
+          Expand-Archive -Path $appZip -DestinationPath "${{ github.workspace }}" -Force
+          Remove-Item $appZip -Force
 
       - name: Install dependencies
+        shell: pwsh
+        working-directory: ${{ github.workspace }}
         run: npm install
 
+      - name: Ensure PM2 is available
+        shell: pwsh
+        run: npm install -g pm2
+
       - name: Restart app with PM2
+        shell: pwsh
+        working-directory: ${{ github.workspace }}
+        env:
+          PORT: ${{ vars.PORT }}
+          NODE_ENV: ${{ vars.NODE_ENV }}
         run: |
-          pm2 delete chat-app || echo "No previous process"
-          pm2 start src/index.js --name chat-app --watch
+          pm2 delete chat-app 2>$null | Out-Null
+          pm2 start "${{ github.workspace }}/src/index.js" --name chat-app --watch
+          pm2 save
