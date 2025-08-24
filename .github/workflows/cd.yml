@@ -1,0 +1,51 @@
+name: CD
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+
+jobs:
+  deploy:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: [self-hosted, deploy]
+
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: node-app-zip
+          path: .
+          run-id: ${{ github.event.workflow_run.id }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Unzip release
+        run: |
+          npm i -g extract-zip
+          rm -rf release
+          mkdir release
+          extract-zip app.zip -d release
+
+      - name: Install PM2
+        run: npm i -g pm2
+
+      - name: Install production dependencies
+        working-directory: release
+        run: npm ci --omit=dev
+
+      - name: Start/Reload chat app with PM2
+        working-directory: release
+        env:
+          APP_NAME: chat-app
+          PORT: ${{ vars.PORT }}
+          NODE_ENV: production
+        run: |
+          pm2 start npm --name "$APP_NAME" -- start
+          pm2 save
+
+      - name: Show PM2 status
+        run: pm2 status
