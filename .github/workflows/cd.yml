@@ -12,12 +12,11 @@ jobs:
 
     steps:
       - name: Show workspace
-        shell: pwsh
-        run: 'Write-Host "Workspace: ${{ github.workspace }}"'
+        shell: powershell
+        run: Write-Host "Workspace: ${{ github.workspace }}"
 
-      # Download artifact using GitHub API + PAT
       - name: Download artifact (node-app-zip) via API
-        shell: pwsh
+        shell: powershell
         env:
           REPO: ${{ github.repository }}
           RUN_ID: ${{ github.event.workflow_run.id }}
@@ -41,26 +40,24 @@ jobs:
           Invoke-WebRequest -Headers $headers -Uri $artifact.archive_download_url -OutFile $zip1
           Write-Host "Downloaded artifact archive to $zip1"
 
-          # Extract outer artifact archive
           Expand-Archive -Path $zip1 -DestinationPath "${{ github.workspace }}" -Force
 
-          # Extract inner app.zip
           $appZip = Join-Path "${{ github.workspace }}" "app.zip"
           if (-not (Test-Path $appZip)) { throw "Inner app.zip not found after first expand." }
           Expand-Archive -Path $appZip -DestinationPath "${{ github.workspace }}" -Force
           Remove-Item $appZip -Force
 
       - name: Install dependencies
-        shell: pwsh
+        shell: powershell
         working-directory: ${{ github.workspace }}
         run: npm install
 
       - name: Ensure PM2 is available
-        shell: pwsh
+        shell: powershell
         run: npm install -g pm2
 
       - name: Restart app with PM2
-        shell: pwsh
+        shell: powershell
         working-directory: ${{ github.workspace }}
         env:
           PORT: ${{ vars.PORT }}
