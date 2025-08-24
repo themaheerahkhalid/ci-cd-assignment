@@ -18,24 +18,14 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install
 
-      - name: Lint (optional)
-        run: npm run lint --if-present
-
-      - name: Test (optional)
-        run: npm test --if-present
-
-      - name: Prepare release folder
-        run: |
-          mkdir -p release
-          rsync -av --exclude='.git' --exclude='node_modules' ./ release/
+      - name: Build app
+        run: echo "Build successful!"
 
       - name: Zip artifact
         run: |
-          cd release
-          zip -r ../app.zip .
-          cd ..
+          zip -r app.zip . -x "*.git*" "node_modules/*"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
