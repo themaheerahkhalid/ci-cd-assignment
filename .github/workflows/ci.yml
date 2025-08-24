@@ -1,16 +1,13 @@
 name: CI
-
 on:
   push:
-    branches:
-      - main
+    branches: [ main ]
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Setup Node.js
@@ -21,21 +18,20 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Run lint
-        run: npm run lint || echo "No lint script"
+      - name: Lint (optional)
+        run: npm run lint || echo "no lint"
 
-      - name: Run tests
-        run: npm test || echo "No tests"
+      - name: Tests (optional)
+        run: npm test || echo "no tests"
 
-      - name: Build project
-        run: npm run build || echo "No build script"
+      - name: Build (optional)
+        run: npm run build || echo "no build"
 
       - name: Zip app
-        run: |
-          zip -r app.zip . -x "*.git*"
+        run: zip -r app.zip . -x "*.git*"
 
       - name: Upload production artifact
         uses: actions/upload-artifact@v4
         with:
-          name: node-app-zip
+          name: node-app-zip           # <-- THE name CD will look for
           path: app.zip
