@@ -8,8 +8,9 @@ on:
 
 jobs:
   deploy:
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: self-hosted
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+
     steps:
       - name: Download artifact
         uses: actions/download-artifact@v4
@@ -17,14 +18,13 @@ jobs:
           name: node-app-zip
           path: .
 
-      - name: Unzip artifact
-        run: unzip -o app.zip -d .
+      - name: Unzip app
+        run: Expand-Archive -Path app.zip -DestinationPath . -Force
 
       - name: Install dependencies
         run: npm install
 
-      - name: Install PM2 globally
-        run: npm install -g pm2
-
-      - name: Start app with PM2
-        run: pm2 start src/index.js --name chat-app --watch
+      - name: Restart app with PM2
+        run: |
+          pm2 delete chat-app || echo "No previous process"
+          pm2 start src/index.js --name chat-app --watch
